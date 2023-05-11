@@ -1,0 +1,53 @@
+
+declare 
+
+      cursor table_cursor is 
+      
+     select CONS.TABLE_NAME as Table_Name , cols.column_name as col_name
+     from user_constraints cons 
+     JOIN user_cons_columns cols
+     ON cons.constraint_name = cols.constraint_name
+     JOIN USER_TAB_COLUMNS TCOL
+     ON cols.column_name = TCOL.column_name
+     WHERE cols.Table_NAME = TCOL.Table_Name
+     and   TCOL.DATA_TYPE= 'NUMBER' 
+     and cons.constraint_type = 'P';
+     
+     col_id_max number (10);
+     
+  Begin 
+     
+     for table_record IN table_cursor 
+     
+      Loop 
+     
+         execute immediate  ' DROP SEQUENCE  ' ||  table_record.Table_Name || '_seq' ;
+     
+     
+         execute immediate ' select NVL( max(' ||table_record.col_name|| '),0)+1 
+           from '||table_record.Table_Name into col_id_max ;    
+                 
+         execute immediate 'create sequence ' ||table_record.Table_Name|| '_seq' ||
+              ' start with '||col_id_max||
+             '  increment by 1
+              maxvalue 8888888
+              minvalue 1'; 
+              
+            
+      
+             execute immediate 'create or replace trigger '||table_record.Table_Name|| '_trig '||
+             ' before insert 
+              on '||table_record.Table_Name||
+              ' referencing NEW AS NEW OLD AS OLD
+              FOR EACH ROW
+              BEGIN 
+              
+                :NEW.'||table_record.col_name||':= '||table_record.Table_Name|| '_seq'||'.NEXTVAL;
+                
+                END ;';
+      
+     END LOOP;
+     
+   END;
+   
+   show errors;
